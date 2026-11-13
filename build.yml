@@ -1,0 +1,54 @@
+name: Build APK dari ZIP
+
+on:
+  push:
+    paths:
+      - '*.zip'
+      - '.github/workflows/build.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Ekstrak ZIP
+        run: |
+          ZIP=$(ls -1 *.zip | head -n1)
+          echo "Memakai: $ZIP"
+          mkdir tmp && unzip -q "$ZIP" -d tmp
+          F=$(find tmp -name settings.gradle.kts | head -n1)
+          if [ -z "$F" ]; then echo "settings.gradle.kts tidak ditemukan di ZIP"; exit 1; fi
+          mv "$(dirname "$F")" proj
+          ls proj
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.7
+          build-root-directory: proj
+
+      - name: Build debug APK
+        working-directory: proj
+        run: gradle assembleDebug --no-daemon
+
+      - name: Simpan APK sebagai artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CucuPintar-APK
+          path: proj/app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Publikasikan ke Releases (link unduh langsung)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: terbaru
+          name: Cucu Pintar (terbaru)
+          files: proj/app/build/outputs/apk/debug/app-debug.apk
